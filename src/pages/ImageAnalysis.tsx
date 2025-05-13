@@ -1,13 +1,13 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { analyzeImages } from "@/utils/dataUtils";
+import { analyzeImagesWithGemini } from "@/utils/geminiUtils";
 import { mockIncidents } from "@/data/mockIncidents";
 import { CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const ImageAnalysis: React.FC = () => {
   const [beforeImage, setBeforeImage] = useState<string>("");
@@ -18,61 +18,98 @@ const ImageAnalysis: React.FC = () => {
     resolved: boolean;
     confidence: number;
   } | null>(null);
-  
+
   // Function to handle image selection
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
+      console.log(`Selected ${type} image:`, file.name, `Size: ${file.size} bytes`);
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size exceeds 5MB. Please upload a smaller image.");
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.match(/image\/(jpeg|png|jpg)/i)) {
+        toast.error("Please upload a JPEG or PNG image.");
+        return;
+      }
+
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         if (e.target?.result) {
+          const result = e.target.result as string;
+          console.log(`Image (${type}) data:`, result.substring(0, 50));
           if (type === "before") {
-            setBeforeImage(e.target.result as string);
+            setBeforeImage(result);
           } else {
-            setAfterImage(e.target.result as string);
+            setAfterImage(result);
           }
+        } else {
+          toast.error(`Failed to read ${type} image.`);
         }
       };
-      
+
+      reader.onerror = () => {
+        toast.error(`Error reading ${type} image file.`);
+      };
+
       reader.readAsDataURL(file);
     }
   };
-  
+
   // Function to use sample images
   const useSampleImages = () => {
+    console.log("Loading sample images...");
     if (mockIncidents.length > 0) {
       const sample = mockIncidents[0];
+      console.log("Sample images:", {
+        before: sample.images.before.substring(0, 50),
+        after: sample.images.after.substring(0, 50)
+      });
       setBeforeImage(sample.images.before);
       setAfterImage(sample.images.after);
+      toast.success("Sample images loaded successfully");
+    } else {
+      toast.error("No sample images available");
     }
   };
-  
+
+  // Function to analyze images
   const handleAnalyze = async () => {
-    if (!beforeImage || !afterImage) return;
-    
+    console.log("Analyze button clicked", { beforeImage: beforeImage.substring(0, 50), afterImage: afterImage.substring(0, 50) });
+    if (!beforeImage || !afterImage) {
+      toast.error("Please upload both before and after images");
+      return;
+    }
+
     setLoading(true);
-    
+
     try {
-      // Call the analysis function from dataUtils
-      const analysisResult = await analyzeImages(beforeImage, afterImage);
+      const analysisResult = await analyzeImagesWithGemini(beforeImage, afterImage);
+      console.log("Analysis result:", analysisResult);
       setResult(analysisResult);
+      toast.success("Analysis completed successfully");
     } catch (error) {
       console.error("Error analyzing images:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to analyze images. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Image Difference Analysis</h1>
         <p className="text-muted-foreground mt-1">
-          Compare before and after images to analyze resolution status
+          Compare before and after images to analyze resolution status using Gemini AI
         </p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Upload Images</CardTitle>
@@ -85,49 +122,49 @@ const ImageAnalysis: React.FC = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="before-image">Before Image</Label>
-                <Input 
-                  id="before-image" 
-                  type="file" 
-                  accept="image/*"
+                <Input
+                  id="before-image"
+                  type="file"
+                  accept="image/jpeg,image/png"
                   onChange={(e) => handleImageSelect(e, "before")}
                 />
               </div>
-              
+
               {beforeImage && (
                 <div className="border rounded-md overflow-hidden h-48 flex items-center justify-center bg-muted">
-                  <img 
-                    src={beforeImage} 
-                    alt="Before" 
-                    className="max-w-full max-h-full object-contain" 
+                  <img
+                    src={beforeImage}
+                    alt="Before"
+                    className="max-w-full max-h-full object-contain"
                   />
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="after-image">After Image</Label>
-                <Input 
-                  id="after-image" 
-                  type="file" 
-                  accept="image/*"
+                <Input
+                  id="after-image"
+                  type="file"
+                  accept="image/jpeg,image/png"
                   onChange={(e) => handleImageSelect(e, "after")}
                 />
               </div>
-              
+
               {afterImage && (
                 <div className="border rounded-md overflow-hidden h-48 flex items-center justify-center bg-muted">
-                  <img 
-                    src={afterImage} 
-                    alt="After" 
-                    className="max-w-full max-h-full object-contain" 
+                  <img
+                    src={afterImage}
+                    alt="After"
+                    className="max-w-full max-h-full object-contain"
                   />
                 </div>
               )}
             </div>
           </div>
-          
-          <div className="flex justify-between mt-6">
+
+          <div className="flex gap-4 mt-6">
             <Button
               variant="outline"
               type="button"
@@ -135,7 +172,7 @@ const ImageAnalysis: React.FC = () => {
             >
               Use Sample Images
             </Button>
-            
+
             <Button
               type="button"
               onClick={handleAnalyze}
@@ -146,7 +183,7 @@ const ImageAnalysis: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-      
+
       {result && (
         <Card>
           <CardHeader>
@@ -191,7 +228,7 @@ const ImageAnalysis: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-muted p-4 rounded-md">
                 <h4 className="font-medium mb-2">Description</h4>
                 <p className="text-sm">{result.description}</p>
