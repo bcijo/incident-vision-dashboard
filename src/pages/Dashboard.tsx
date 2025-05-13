@@ -2,10 +2,7 @@
 import React from "react";
 import { BarChart, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import StatCard from "@/components/charts/StatCard";
-import IncidentsByTaluk from "@/components/charts/IncidentsByTaluk";
-import IncidentTypeDistribution from "@/components/charts/IncidentTypeDistribution";
-import ResolutionTimeByType from "@/components/charts/ResolutionTimeByType";
-import SeverityDistribution from "@/components/charts/SeverityDistribution";
+import IframePlot from "@/components/charts/IframePlot";
 import { mockIncidents } from "@/data/mockIncidents";
 
 const Dashboard: React.FC = () => {
@@ -73,13 +70,25 @@ const Dashboard: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <IncidentsByTaluk />
-        <IncidentTypeDistribution />
+        <IframePlot 
+          src="/plots/complaints_by_taluk.html" 
+          title="Incidents by Taluk"
+        />
+        <IframePlot 
+          src="/plots/Incident Type distribution.html" 
+          title="Incident Type Distribution"
+        />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ResolutionTimeByType />
-        <SeverityDistribution />
+        <IframePlot 
+          src="/plots/Complaint trends over time.html" 
+          title="Complaint Trends"
+        />
+        <IframePlot 
+          src="/plots/Top Performing Officers.html" 
+          title="Top Performing Officers"
+        />
       </div>
     </div>
   );
