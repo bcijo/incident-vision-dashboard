@@ -28,12 +28,15 @@ export const analyzeImagesWithGemini = async (
     // Extract base64 data from data URLs
     const getBase64Data = (dataUrl: string, type: string) => {
       console.log(`Extracting base64 data for ${type}:`, dataUrl.substring(0, 50));
-      const matches = dataUrl.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+      // Fixed regex to match data:image/<format>;base64,<data>
+      const matches = dataUrl.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/i);
       if (!matches || matches.length !== 3) {
+        console.error(`Invalid data URL format for ${type}:`, dataUrl.substring(0, 100));
         throw new Error(`Invalid image data format for ${type} image`);
       }
       const format = matches[1].toLowerCase();
       if (!["jpeg", "png", "jpg"].includes(format)) {
+        console.error(`Unsupported format for ${type}:`, format);
         throw new Error(`Unsupported image format for ${type}: ${format}. Use JPEG or PNG.`);
       }
       return {
@@ -102,13 +105,9 @@ export const analyzeImagesWithGemini = async (
       };
     }
 
-    // Fallback for unexpected response
-    console.warn("Unexpected response format:", text);
-    return {
-      description: text || "Analysis completed, but no structured data returned.",
-      resolved: false,
-      confidence: 0.7
-    };
+    // Handle unexpected response
+    console.error("Unexpected response format:", text);
+    throw new Error("Invalid response format from Gemini API");
   } catch (error) {
     console.error("Detailed error in analyzeImagesWithGemini:", error);
     if (error instanceof Error) {

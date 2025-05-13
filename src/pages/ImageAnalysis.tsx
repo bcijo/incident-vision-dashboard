@@ -19,6 +19,23 @@ const ImageAnalysis: React.FC = () => {
     confidence: number;
   } | null>(null);
 
+  // Function to validate data URL format
+  const isValidDataUrl = (dataUrl: string, type: string): boolean => {
+    const matches = dataUrl.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/i);
+    if (!matches || matches.length !== 3) {
+      console.error(`Invalid data URL format for ${type}:`, dataUrl.substring(0, 100));
+      toast.error(`Invalid image format for ${type} image. Please upload a valid JPEG or PNG.`);
+      return false;
+    }
+    const format = matches[1].toLowerCase();
+    if (!["jpeg", "png", "jpg"].includes(format)) {
+      console.error(`Unsupported format for ${type}:`, format);
+      toast.error(`Unsupported image format for ${type}: ${format}. Use JPEG or PNG.`);
+      return false;
+    }
+    return true;
+  };
+
   // Function to handle image selection
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") => {
     if (event.target.files && event.target.files[0]) {
@@ -43,10 +60,13 @@ const ImageAnalysis: React.FC = () => {
         if (e.target?.result) {
           const result = e.target.result as string;
           console.log(`Image (${type}) data:`, result.substring(0, 50));
-          if (type === "before") {
-            setBeforeImage(result);
-          } else {
-            setAfterImage(result);
+          // Validate data URL before setting state
+          if (isValidDataUrl(result, type)) {
+            if (type === "before") {
+              setBeforeImage(result);
+            } else {
+              setAfterImage(result);
+            }
           }
         } else {
           toast.error(`Failed to read ${type} image.`);
@@ -70,9 +90,15 @@ const ImageAnalysis: React.FC = () => {
         before: sample.images.before.substring(0, 50),
         after: sample.images.after.substring(0, 50)
       });
-      setBeforeImage(sample.images.before);
-      setAfterImage(sample.images.after);
-      toast.success("Sample images loaded successfully");
+      // Validate sample images
+      if (
+        isValidDataUrl(sample.images.before, "before sample") &&
+        isValidDataUrl(sample.images.after, "after sample")
+      ) {
+        setBeforeImage(sample.images.before);
+        setAfterImage(sample.images.after);
+        toast.success("Sample images loaded successfully");
+      }
     } else {
       toast.error("No sample images available");
     }
@@ -80,7 +106,10 @@ const ImageAnalysis: React.FC = () => {
 
   // Function to analyze images
   const handleAnalyze = async () => {
-    console.log("Analyze button clicked", { beforeImage: beforeImage.substring(0, 50), afterImage: afterImage.substring(0, 50) });
+    console.log("Analyze button clicked", {
+      beforeImage: beforeImage.substring(0, 50),
+      afterImage: afterImage.substring(0, 50)
+    });
     if (!beforeImage || !afterImage) {
       toast.error("Please upload both before and after images");
       return;
