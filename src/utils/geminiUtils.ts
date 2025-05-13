@@ -10,6 +10,85 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+/**
+ * Predicts a severity score for an incident based on its details
+ * @param incidentType The type of incident (e.g., 'water-logging', 'fire')
+ * @param description The description of the incident
+ * @param taluk The location/taluk where the incident occurred
+ * @returns An object containing the severity score (1-5) and explanation
+ */
+export const predictSeverityScore = async (
+  incidentType: string,
+  description: string,
+  taluk: string
+): Promise<{ score: number; explanation: string }> => {
+  try {
+    // Create model instance using the 2.5 Flash model as specified
+    const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash-preview-04-17" });
+    console.log("Model initialized: models/gemini-2.5-flash-preview-04-17");
+
+    // Craft a prompt that will generate a severity score from 1-5 with a one-line explanation
+    const prompt = `
+      You are an AI assistant tasked with assessing the severity of incidents for emergency response prioritization.
+      
+      Analyze the following incident details:
+      - Type: ${incidentType}
+      - Description: ${description}
+      - Location: ${taluk}
+      
+      Rate the severity of this incident on a scale of 1 to 5, where:
+      1 = Minor incident with minimal impact
+      2 = Low severity with limited disruption
+      3 = Moderate severity requiring attention
+      4 = High severity with significant impact
+      5 = Critical emergency requiring immediate response
+      
+      Provide your response in this exact format:
+      {"score": [1-5], "explanation": "[One sentence explanation for the rating]"}
+    `;
+
+    console.log("Sending severity prediction request to Gemini API...");
+
+    // Generate content
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().trim();
+    
+    console.log("Received severity prediction from Gemini API");
+
+    // Parse the JSON response
+    try {
+      // Extract JSON if it's embedded in other text
+      const jsonMatch = text.match(/\{\s*"score"\s*:\s*\d+\s*,\s*"explanation"\s*:\s*"[^"]+"\s*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : text;
+      
+      const parsedResponse = JSON.parse(jsonStr);
+      
+      // Validate the response format
+      if (typeof parsedResponse.score !== 'number' || typeof parsedResponse.explanation !== 'string') {
+        throw new Error("Invalid response format");
+      }
+      
+      // Ensure score is between 1-5
+      const score = Math.max(1, Math.min(5, Math.round(parsedResponse.score)));
+      
+      return {
+        score,
+        explanation: parsedResponse.explanation
+      };
+    } catch (parseError) {
+      console.error("Failed to parse Gemini response:", text);
+      throw new Error(`Failed to parse severity prediction: ${parseError.message}`);
+    }
+  } catch (error) {
+    console.error("Error in predictSeverityScore:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to predict severity: ${error.message}`);
+    }
+    throw new Error("Failed to predict severity: Unknown error");
+  }
+};
+
 export const analyzeImagesWithGemini = async (
   beforeImage: string,
   afterImage: string
