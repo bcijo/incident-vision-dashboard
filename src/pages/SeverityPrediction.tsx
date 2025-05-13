@@ -39,9 +39,8 @@ const SeverityPrediction: React.FC = () => {
         // Use Gemini for prediction
         const result = await predictSeverityScore(incidentTypeName, description, talukName);
         
-        // Convert 1-5 scale to 1-10 scale for consistency with the app
-        const scaledScore = Math.round(result.score * 2);
-        setSeverity(scaledScore);
+        // Use the 1-5 scale directly from Gemini
+        setSeverity(result.score);
         setExplanation(result.explanation);
       } else {
         // Fallback to original calculation method
@@ -63,18 +62,20 @@ const SeverityPrediction: React.FC = () => {
   
   // Get color for severity indicator
   const getSeverityColor = (score: number): string => {
-    if (score <= 3) return "bg-green-500";
-    if (score <= 6) return "bg-yellow-500";
-    if (score <= 8) return "bg-orange-500";
-    return "bg-red-500";
+    if (score === 1) return "bg-green-500";
+    if (score === 2) return "bg-teal-500";
+    if (score === 3) return "bg-yellow-500";
+    if (score === 4) return "bg-orange-500";
+    return "bg-red-500"; // score === 5
   };
   
   // Get severity level text
   const getSeverityText = (score: number): string => {
-    if (score <= 3) return "Low";
-    if (score <= 6) return "Medium";
-    if (score <= 8) return "High";
-    return "Critical";
+    if (score === 1) return "Minor";
+    if (score === 2) return "Low";
+    if (score === 3) return "Moderate";
+    if (score === 4) return "High";
+    return "Critical"; // score === 5
   };
   
   return (
@@ -211,7 +212,7 @@ const SeverityPrediction: React.FC = () => {
                         severity
                       )}`}
                     >
-                      {severity}
+                      {severity}/5
                     </div>
                   </div>
                 </div>
