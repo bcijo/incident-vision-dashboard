@@ -13,7 +13,7 @@ const ResolutionTimePrediction: React.FC = () => {
   const [incidentType, setIncidentType] = useState<string>("");
   const [taluk, setTaluk] = useState<string>("");
   const [month, setMonth] = useState<string>("");
-  const [severity, setSeverity] = useState<number>(5);
+  const [severity, setSeverity] = useState<number>(3);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState<{
     minutes: number;
@@ -43,8 +43,9 @@ const ResolutionTimePrediction: React.FC = () => {
     
     // Simulate API call delay
     setTimeout(() => {
-      // Use user-selected severity
-      const minutes = predictResolutionTime(incidentType, taluk, severity);
+      // Use user-selected severity (scale from 1-5 to 1-10 for the prediction function)
+      const scaledSeverity = Math.min(10, Math.round(severity * 2));
+      const minutes = predictResolutionTime(incidentType, taluk, scaledSeverity);
       
       // Apply seasonal adjustment based on month
       let seasonalFactor = 1.0;
@@ -163,14 +164,14 @@ const ResolutionTimePrediction: React.FC = () => {
                   <div className="flex justify-between">
                     <Label htmlFor="severity">Severity ({severity})</Label>
                     <span className="text-sm text-muted-foreground">
-                      1 (Minor) to 10 (Critical)
+                      1 (Minor) to 5 (Critical)
                     </span>
                   </div>
                   <input
                     type="range"
                     id="severity"
                     min="1"
-                    max="10"
+                    max="5"
                     step="1"
                     value={severity}
                     onChange={(e) => setSeverity(parseInt(e.target.value))}
@@ -178,7 +179,9 @@ const ResolutionTimePrediction: React.FC = () => {
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Minor</span>
+                    <span>Low</span>
                     <span>Moderate</span>
+                    <span>High</span>
                     <span>Critical</span>
                   </div>
                 </div>
