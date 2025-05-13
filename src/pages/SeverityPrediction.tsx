@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { incidentTypes } from "@/data/incidentTypes";
 import { talukData } from "@/data/talukData";
 import { calculateIncidentSeverity } from "@/utils/dataUtils";
+import { predictSeverityScore } from "@/utils/geminiUtils";
 
 const SeverityPrediction: React.FC = () => {
   const [incidentType, setIncidentType] = useState<string>("");
@@ -16,18 +19,46 @@ const SeverityPrediction: React.FC = () => {
   const [description, setDescription] = useState<string>("");
   const [severity, setSeverity] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [explanation, setExplanation] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [useGemini, setUseGemini] = useState<boolean>(true);
   
-  const handlePredict = () => {
+  const handlePredict = async () => {
     if (!incidentType || !taluk) return;
     
     setLoading(true);
+    setError("");
+    setExplanation("");
     
-    // Simulate API call delay
-    setTimeout(() => {
+    try {
+      if (useGemini && description) {
+        // Get incident type name for better context
+        const incidentTypeName = incidentTypes.find(type => type.id === incidentType)?.name || incidentType;
+        const talukName = talukData.find(t => t.id === taluk)?.name || taluk;
+        
+        // Use Gemini for prediction
+        const result = await predictSeverityScore(incidentTypeName, description, talukName);
+        
+        // Convert 1-5 scale to 1-10 scale for consistency with the app
+        const scaledScore = Math.round(result.score * 2);
+        setSeverity(scaledScore);
+        setExplanation(result.explanation);
+      } else {
+        // Fallback to original calculation method
+        const predictedSeverity = calculateIncidentSeverity(incidentType, taluk);
+        setSeverity(predictedSeverity);
+        setExplanation("");
+      }
+    } catch (err) {
+      console.error("Prediction error:", err);
+      setError(err instanceof Error ? err.message : "Failed to predict severity");
+      
+      // Fallback to original calculation method
       const predictedSeverity = calculateIncidentSeverity(incidentType, taluk);
       setSeverity(predictedSeverity);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
   
   // Get color for severity indicator
@@ -120,15 +151,41 @@ const SeverityPrediction: React.FC = () => {
                     placeholder="Describe the incident"
                     rows={4}
                   />
+                  {useGemini && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Description is required for Gemini AI prediction
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="use-gemini"
+                    checked={useGemini}
+                    onChange={(e) => setUseGemini(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="use-gemini" className="text-sm font-normal cursor-pointer">
+                    Use Gemini AI for advanced severity prediction
+                  </Label>
                 </div>
                 
                 <Button 
                   type="button" 
                   onClick={handlePredict}
-                  disabled={!incidentType || !taluk || loading}
+                  disabled={!incidentType || !taluk || (useGemini && !description) || loading}
                 >
                   {loading ? "Predicting..." : "Predict Severity"}
                 </Button>
+                
+                {error && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -163,9 +220,18 @@ const SeverityPrediction: React.FC = () => {
                   <h3 className="text-xl font-semibold">
                     {getSeverityText(severity)} Severity
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    This incident requires {getSeverityText(severity).toLowerCase()} priority attention.
-                  </p>
+                  {explanation ? (
+                    <div className="mt-4 p-3 bg-muted rounded-md">
+                      <div className="flex items-start">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+                        <p className="text-sm">{explanation}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      This incident requires {getSeverityText(severity).toLowerCase()} priority attention.
+                    </p>
+                  )}
                 </div>
               </>
             ) : (

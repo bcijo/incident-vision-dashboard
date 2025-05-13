@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { incidentTypes } from "@/data/incidentTypes";
 import { talukData } from "@/data/talukData";
-import { calculateIncidentSeverity, predictResolutionTime } from "@/utils/dataUtils";
+import { predictResolutionTime } from "@/utils/dataUtils";
 
 const ResolutionTimePrediction: React.FC = () => {
   const [incidentType, setIncidentType] = useState<string>("");
   const [taluk, setTaluk] = useState<string>("");
+  const [month, setMonth] = useState<string>("");
   const [severity, setSeverity] = useState<number>(5);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState<{
@@ -19,25 +20,49 @@ const ResolutionTimePrediction: React.FC = () => {
     confidence: number;
   } | null>(null);
   
-  // Automatically calculate severity when incident type and taluk change
-  React.useEffect(() => {
-    if (incidentType && taluk) {
-      const calculatedSeverity = calculateIncidentSeverity(incidentType, taluk);
-      setSeverity(calculatedSeverity);
-    }
-  }, [incidentType, taluk]);
+  // List of months
+  const months = [
+    { id: "01", name: "January" },
+    { id: "02", name: "February" },
+    { id: "03", name: "March" },
+    { id: "04", name: "April" },
+    { id: "05", name: "May" },
+    { id: "06", name: "June" },
+    { id: "07", name: "July" },
+    { id: "08", name: "August" },
+    { id: "09", name: "September" },
+    { id: "10", name: "October" },
+    { id: "11", name: "November" },
+    { id: "12", name: "December" }
+  ];
   
   const handlePredict = () => {
-    if (!incidentType || !taluk) return;
+    if (!incidentType || !taluk || !month) return;
     
     setLoading(true);
     
     // Simulate API call delay
     setTimeout(() => {
+      // Use user-selected severity
       const minutes = predictResolutionTime(incidentType, taluk, severity);
       
+      // Apply seasonal adjustment based on month
+      let seasonalFactor = 1.0;
+      const monthNum = parseInt(month);
+      
+      // Monsoon months (June to September) may have longer resolution times
+      if (monthNum >= 6 && monthNum <= 9) {
+        seasonalFactor = 1.3; // 30% longer during monsoon
+      }
+      // Winter months (December to February) may have slightly longer times
+      else if (monthNum === 12 || monthNum <= 2) {
+        seasonalFactor = 1.1; // 10% longer during winter
+      }
+      
+      const adjustedMinutes = Math.round(minutes * seasonalFactor);
+      
       setPrediction({
-        minutes,
+        minutes: adjustedMinutes,
         confidence: Math.round(70 + Math.random() * 20)
       });
       
@@ -113,25 +138,56 @@ const ResolutionTimePrediction: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="month">Month of Year</Label>
+                    <Select
+                      value={month}
+                      onValueChange={setMonth}
+                    >
+                      <SelectTrigger id="month">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-2 mt-4">
                   <div className="flex justify-between">
                     <Label htmlFor="severity">Severity ({severity})</Label>
                     <span className="text-sm text-muted-foreground">
-                      Auto-calculated
+                      1 (Minor) to 10 (Critical)
                     </span>
                   </div>
-                  <div className="pt-2">
-                    <Progress value={severity * 10} className="h-2" />
+                  <input
+                    type="range"
+                    id="severity"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={severity}
+                    onChange={(e) => setSeverity(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Minor</span>
+                    <span>Moderate</span>
+                    <span>Critical</span>
                   </div>
                 </div>
                 
-                <div className="pt-2">
+                <div className="pt-4">
                   <Button 
                     type="button" 
                     onClick={handlePredict}
-                    disabled={!incidentType || !taluk || loading}
+                    disabled={!incidentType || !taluk || !month || loading}
                   >
                     {loading ? "Predicting..." : "Predict Resolution Time"}
                   </Button>
